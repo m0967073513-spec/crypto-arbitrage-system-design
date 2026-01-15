@@ -11,6 +11,7 @@ from .signals.fees import estimate_total_cost_pct
 from .signals.filters import is_opportunity
 
 from .risk.guards import check_latency
+from .risk.limits import decide_position_usd
 
 from .simulation.paper_trading import simulate_trade
 from .simulation.pnl import pnl_usd
@@ -45,8 +46,22 @@ def main():
         net_pct = spread_pct - cost_pct
 
         if is_opportunity(net_pct, cfg["thresholds"]["min_spread_pct"]):
-            position_usd = cfg["simulation"]["max_position_usd"]
-            pnl = pnl_usd(position_usd, net_pct)
+           decision = decide_position_usd(
+           starting_usd=cfg["simulation"]["starting_usd"],
+           max_position_usd=cfg["simulation"]["max_position_usd"],
+           reserve_usd=cfg["simulation"].get("reserve_usd", 50.0),)
+
+        if not decision.allowed:
+            logger.warning(f"[{symbol}] blocked by limits: {decision.reason}")
+            metric_inc("blocked_limits")
+            continue
+        
+        position_usd = decision.position_usd
+        pnl = pnl_usd(position_usd, net_pct)
+        
+        if decision.reason != "ok":
+            metric_inc("position_capped")
+
 
             simulate_trade(symbol=symbol, net_pct=net_pct, cfg=cfg)
 
