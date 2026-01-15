@@ -16,3 +16,5 @@ fees:
 simulation:
   starting_usd: 1000
   max_position_usd: 200
+  reserve_usd: 50
+
